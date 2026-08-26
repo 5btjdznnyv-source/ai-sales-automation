@@ -1,0 +1,44 @@
+name: AI Sales Automation
+
+on:
+  schedule:
+    - cron: '0 22 * * *'   # 毎日 JST 7:00 に自動実行 (UTC 22:00)
+  workflow_dispatch: {}     # 手動実行ボタンも使えるようにする
+
+jobs:
+  run-automation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: 集客コンテンツ生成
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python src/generate_content.py
+
+      - name: リードスコアリング
+        run: python src/lead_scorer.py
+
+      - name: 販売フォローメール送信
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+        run: python src/nurture_email.py
+
+      - name: 変更をコミット
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add data/
+          git commit -m "🤖 自動更新: コンテンツ生成 & リードスコアリング" || echo "No changes"
+          git push
